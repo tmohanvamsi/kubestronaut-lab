@@ -1,0 +1,142 @@
+---
+# Bootstrap the kind cluster with ArgoCD, Kyverno, and monitoring.
+# Assumes cluster is already running (make cluster-create).
+# Run: ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/setup-cluster.yml
+
+- name: Bootstrap kubestronaut cluster
+  hosts: local
+  gather_facts: false
+  vars:
+    kubeconfig: "{{ lookup('env', 'HOME') }}/.kube/config"
+    argocd_namespace: argocd
+    kyverno_namespace: kyverno
+    monitoring_namespace: monitoring
+
+  tasks:
+    - name: Verify cluster is reachable
+      command: kubectl cluster-info --context kind-kubestronaut
+      changed_when: false
+
+    # ── Namespaces ─────────────────────────────────────────────────────────────
+    - name: Create platform namespaces
+      command: "kubectl create namespace {{ item }} --dry-run=client -o yaml | kubectl apply -f -"
+      loop:
+        - "{{ argocd_namespace }}"
+        - "{{ kyverno_namespace }}"
+        - "{{ monitoring_namespace }}"
+        - apps
+        - staging
+      changed_when: false
+
+    # ── ArgoCD ─────────────────────────────────────────────────────────────────
+    - name: Install ArgoCD
+      shell: |
+        kubectl apply -n {{ argocd_namespace }} \
+          -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+      args:
+        executable: /bin/bash
+      register: argocd_install
+      changed_when: "'created' in argocd_install.stdout or 'configured' in argocd_install.stdout"
+
+    - name: Wait for ArgoCD server
+      command: >
+        kubectl wait --for=condition=available --timeout=180s
+        deployment/argocd-server -n {{ argocd_namespace }}
+      changed_when: false
+
+    # ── Kyverno ────────────────────────────────────────────────────────────────
+    - name: Add Kyverno Helm repo
+      command: helm repo add kyverno https://kyverno.github.io/kyverno/
+      changed_when: false
+      failed_when: false
+
+    - name: Update Helm repos
+      command: helm repo update
+      changed_when: false
+
+    - name: Install Kyverno
+      shell: |
+        helm upgrade --install kyverno kyverno/kyverno \
+          --namespace {{ kyverno_namespace }} \
+          --create-namespace \
+          --set replicaCount=1 \
+          --wait --timeout 3m
+      args:
+        executable: /bin/bash
+      register: kyverno_install
+      changed_when: "'has been upgraded' in kyverno_install.stdout or 'has been deployed' in kyverno_install.stdout"
+
+    - name: Apply Kyverno policies
+      command: kubectl apply -f manifests/kyverno/policies/
+      changed_when: false
+
+    # ── Monitoring ─────────────────────────────────────────────────────────────
+    - name: Add prometheus-community Helm repo
+      command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      changed_when: false
+      failed_when: false
+
+    - name: Add grafana Helm repo
+      command: helm repo add grafana https://grafana.github.io/helm-charts
+      changed_when: false
+      failed_when: false
+
+    - name: Update Helm repos
+      command: helm repo update
+      changed_when: false
+
+    - name: Install kube-prometheus-stack
+      shell: |
+        helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+          --namespace {{ monitoring_namespace }} \
+          --values monitoring/prometheus/values.yaml \
+          --wait --timeout 5m
+      args:
+        executable: /bin/bash
+      register: prom_install
+      changed_when: "'has been upgraded' in prom_install.stdout or 'has been deployed' in prom_install.stdout"
+
+    - name: Install Loki stack
+      shell: |
+        helm upgrade --install loki grafana/loki-stack \
+          --namespace {{ monitoring_namespace }} \
+          --values monitoring/loki/values.yaml \
+          --wait --timeout 3m
+      args:
+        executable: /bin/bash
+      register: loki_install
+      changed_when: "'has been upgraded' in loki_install.stdout or 'has been deployed' in loki_install.stdout"
+
+    # ── RBAC manifests ─────────────────────────────────────────────────────────
+    - name: Apply RBAC manifests
+      command: kubectl apply -f manifests/rbac/
+      changed_when: false
+
+    # ── Network policies ───────────────────────────────────────────────────────
+    - name: Apply network policies
+      command: kubectl apply -f manifests/network-policies/
+      changed_when: false
+
+    # ── Summary ────────────────────────────────────────────────────────────────
+    - name: Print cluster summary
+      shell: |
+        echo "=== Nodes ==="
+        kubectl get nodes -o wide
+        echo ""
+        echo "=== Platform Pods ==="
+        kubectl get pods -n {{ argocd_namespace }}
+        kubectl get pods -n {{ kyverno_namespace }}
+        kubectl get pods -n {{ monitoring_namespace }}
+        echo ""
+        echo "=== Next steps ==="
+        echo "  ArgoCD UI:  make argocd-ui   → http://localhost:8080"
+        echo "  Grafana:    make monitoring-ui → http://localhost:3000"
+        echo "  Password:   make argocd-password"
+      args:
+        executable: /bin/bash
+      register: summary
+      changed_when: false
+
+    - name: Show summary
+      debug:
+        msg: "{{ summary.stdout_lines }}"

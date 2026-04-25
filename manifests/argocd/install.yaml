@@ -1,0 +1,13 @@
+# ArgoCD namespace + official stable install manifest.
+# Applied by: kubectl apply -n argocd -f manifests/argocd/install.yaml
+# Source is pinned to stable; update the URL to target a specific version.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    app.kubernetes.io/part-of: argocd
+---
+# The actual ArgoCD resources are fetched from upstream at install time.
+# Run: kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+# This file exists as documentation; 'make argocd-install' handles the fetch.

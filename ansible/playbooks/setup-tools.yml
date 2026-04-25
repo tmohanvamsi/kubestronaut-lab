@@ -1,0 +1,137 @@
+---
+# Install all kubestronaut toolchain on macOS (local) or Ubuntu (remote).
+# Run: ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/setup-tools.yml
+
+- name: Install kubestronaut toolchain (macOS)
+  hosts: local
+  gather_facts: true
+  vars:
+    kubectl_version: "v1.30.0"
+    helm_version: "v3.15.0"
+    kind_version: "v0.23.0"
+    argocd_version: "v2.11.0"
+    kyverno_version: "v1.12.0"
+    istio_version: "1.22.0"
+
+  tasks:
+    - name: Check OS
+      debug:
+        msg: "Detected OS: {{ ansible_os_family }}"
+
+    # ── Homebrew packages (macOS) ──────────────────────────────────────────────
+    - name: Install base tools via Homebrew (macOS)
+      community.general.homebrew:
+        name:
+          - kubectl
+          - helm
+          - kind
+          - kubeseal
+          - k9s
+          - stern
+          - kubectx
+          - terraform
+          - ansible
+        state: present
+      when: ansible_os_family == "Darwin"
+
+    - name: Install ArgoCD CLI (macOS)
+      community.general.homebrew:
+        name: argocd
+        state: present
+      when: ansible_os_family == "Darwin"
+
+    - name: Install istioctl (macOS)
+      community.general.homebrew:
+        name: istioctl
+        state: present
+      when: ansible_os_family == "Darwin"
+
+    - name: Install kyverno CLI (macOS)
+      community.general.homebrew:
+        name: kyverno
+        state: present
+      when: ansible_os_family == "Darwin"
+
+    # ── apt packages (Ubuntu/Debian) ───────────────────────────────────────────
+    - name: Install base packages (Linux)
+      become: true
+      apt:
+        name:
+          - curl
+          - ca-certificates
+          - git
+          - unzip
+          - jq
+          - bash-completion
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install kubectl (Linux)
+      become: true
+      get_url:
+        url: "https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/amd64/kubectl"
+        dest: /usr/local/bin/kubectl
+        mode: "0755"
+      when: ansible_os_family == "Debian"
+
+    - name: Install Helm (Linux)
+      become: true
+      shell: |
+        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
+      when: ansible_os_family == "Debian"
+
+    - name: Install kind (Linux)
+      become: true
+      get_url:
+        url: "https://kind.sigs.k8s.io/dl/{{ kind_version }}/kind-linux-amd64"
+        dest: /usr/local/bin/kind
+        mode: "0755"
+      when: ansible_os_family == "Debian"
+
+    - name: Install ArgoCD CLI (Linux)
+      become: true
+      get_url:
+        url: "https://github.com/argoproj/argo-cd/releases/download/{{ argocd_version }}/argocd-linux-amd64"
+        dest: /usr/local/bin/argocd
+        mode: "0755"
+      when: ansible_os_family == "Debian"
+
+    - name: Install istioctl (Linux)
+      shell: |
+        curl -L https://istio.io/downloadIstio | ISTIO_VERSION={{ istio_version }} sh -
+        sudo mv istio-{{ istio_version }}/bin/istioctl /usr/local/bin/
+        rm -rf istio-{{ istio_version }}
+      args:
+        creates: /usr/local/bin/istioctl
+      become: false
+      when: ansible_os_family == "Debian"
+
+    - name: Install Terraform (Linux)
+      become: true
+      shell: |
+        curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
+          > /etc/apt/sources.list.d/hashicorp.list
+        apt-get update && apt-get install -y terraform
+      args:
+        creates: /usr/local/bin/terraform
+      when: ansible_os_family == "Debian"
+
+    # ── Verify ─────────────────────────────────────────────────────────────────
+    - name: Verify tool versions
+      shell: |
+        echo "kubectl:  $(kubectl version --client --short 2>/dev/null || kubectl version --client)"
+        echo "helm:     $(helm version --short)"
+        echo "kind:     $(kind version)"
+        echo "argocd:   $(argocd version --client --short 2>/dev/null || echo 'not found')"
+        echo "istioctl: $(istioctl version --remote=false 2>/dev/null || echo 'not found')"
+        echo "terraform:$(terraform version | head -1)"
+      register: versions
+      changed_when: false
+
+    - name: Show installed versions
+      debug:
+        msg: "{{ versions.stdout_lines }}"

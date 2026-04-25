@@ -1,0 +1,14 @@
+# Allow pods within the same namespace to talk to each other.
+# Pair this with deny-all-ingress to get namespace isolation.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: apps
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
