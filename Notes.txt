@@ -113,4 +113,8 @@ kubectl get nodes
 
 Everything — ArgoCD, Kyverno, Terraform state, network policies — all persists. You won't need to reinstall anything, just continue from Pod Security Standards.
 
+
+# 3. Resume from here
+kubectl apply -f manifests/pod-security/restricted-namespace.yaml
+
 See you tomorrow!
