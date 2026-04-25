@@ -92,9 +92,9 @@ ansible-cluster:
 
 argocd-install:
 	$(KUBECTL) create namespace $(ARGOCD_NS) --dry-run=client -o yaml | $(KUBECTL) apply -f -
-	$(KUBECTL) apply -n $(ARGOCD_NS) -f manifests/argocd/install.yaml
-	@echo "Waiting for ArgoCD to be ready..."
-	$(KUBECTL) wait --for=condition=available --timeout=120s deployment/argocd-server -n $(ARGOCD_NS)
+	$(KUBECTL) apply -n $(ARGOCD_NS) --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+	@echo "Waiting for ArgoCD to be ready (this takes ~2 minutes)..."
+	$(KUBECTL) wait --for=condition=available --timeout=180s deployment/argocd-server -n $(ARGOCD_NS)
 
 argocd-password:
 	@$(KUBECTL) -n $(ARGOCD_NS) get secret argocd-initial-admin-secret \

@@ -1,0 +1,116 @@
+Got it — I'll give you the commands, you run them, then ask me anything. Here's your full sequence:
+
+Step 0 — Install missing tools
+Run these one at a time:
+
+
+brew install ansible
+
+brew install argocd
+
+brew install istioctl
+After each one finishes, verify:
+
+
+ansible --version | head -1
+argocd version --client --short
+istioctl version --remote=false
+Step 1 — Create the cluster
+
+cd /Users/tmohanvamsi/Documents/Code/kubestronaut-lab
+make cluster-create
+Takes ~2 minutes. While it runs, open kind/cluster.yaml in your editor and read the comments — ask me about anything you don't understand.
+
+After it completes:
+
+
+kubectl get nodes -o wide --show-labels
+
+docker ps --format "table {{.Names}}\t{{.Status}}"
+
+kubectl get pods -n kube-system
+Step 2 — Terraform (namespaces + RBAC + quotas)
+
+make terraform-init
+
+make terraform-apply
+After it completes:
+
+
+kubectl get namespaces
+
+kubectl describe role developer -n apps
+
+kubectl describe resourcequota apps-quota -n apps
+Step 3 — ArgoCD
+
+make argocd-install
+After ready:
+
+
+kubectl get pods -n argocd
+
+make argocd-password
+Open http://localhost:8080 (in a separate terminal run make argocd-ui first).
+
+Step 4 — Kyverno
+
+make kyverno-install
+
+make kyverno-policies
+
+kubectl get clusterpolicies
+Step 5 — Monitoring
+
+make monitoring-install
+After ready (~5 min):
+
+
+kubectl get pods -n monitoring
+In a separate terminal:
+
+
+make monitoring-ui
+Open http://localhost:3000 → login: admin / prom-operator
+
+Run Step 0 first (brew installs), then come back. Ask me a question at any step — "what is etcd?", "why NodePort?", "what does serviceMonitorSelector do?" — anything.
+
+
+
+wmI123GFh7Toa1DR
+
+
+XXXXXX
+
+Tear everything down now
+Step 1 — Delete test pods we created:
+
+
+kubectl delete pod client server attacker bad-pod no-limits-pod -n apps --ignore-not-found
+kubectl delete pod attacker -n default --ignore-not-found
+
+Step 2 — Stop the kind cluster (keeps it intact, just stops Docker containers):
+
+
+docker stop kubestronaut-control-plane kubestronaut-worker kubestronaut-worker2
+
+Step 3 — Verify stopped:
+
+
+docker ps | grep kubestronaut
+
+Should return nothing.
+
+Tomorrow to resume
+
+# Start containers back up
+
+docker start kubestronaut-control-plane kubestronaut-worker kubestronaut-worker2
+
+# Wait ~30 seconds then verify cluster is back
+
+kubectl get nodes
+
+Everything — ArgoCD, Kyverno, Terraform state, network policies — all persists. You won't need to reinstall anything, just continue from Pod Security Standards.
+
+See you tomorrow!
