@@ -18,10 +18,16 @@ alertmanager:
 grafana:
   enabled: true
   replicas: 1
-  adminPassword: prom-operator
+  adminPassword: "${GRAFANA_ADMIN_PASSWORD}"  # set via .env.local — never commit real passwords
   service:
     type: NodePort
     nodePort: 30300
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      url: http://loki:3100
+      access: proxy
+      isDefault: false
   dashboardProviders:
     dashboardproviders.yaml:
       apiVersion: 1

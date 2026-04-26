@@ -1,0 +1,16 @@
+# Local secrets — never commit these
+.env.local
+*.env
+secrets/
+
+# Terraform state
+terraform/**/.terraform/
+terraform/**/terraform.tfstate
+terraform/**/terraform.tfstate.backup
+terraform/**/.terraform.lock.hcl
+
+# kubeconfig backups
+*.kubeconfig
+
+# OS
+.DS_Store

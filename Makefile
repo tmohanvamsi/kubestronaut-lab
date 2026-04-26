@@ -128,10 +128,19 @@ monitoring-install:
 		--namespace $(MONITORING_NS) \
 		--values monitoring/prometheus/values.yaml \
 		--wait --timeout 5m
-	$(HELM) upgrade --install loki grafana/loki-stack \
+	$(HELM) upgrade --install loki grafana/loki \
 		--namespace $(MONITORING_NS) \
-		--values monitoring/loki/values.yaml \
-		--wait
+		--set loki.auth_enabled=false \
+		--set loki.commonConfig.replication_factor=1 \
+		--set loki.storage.type=filesystem \
+		--set loki.useTestSchema=true \
+		--set singleBinary.replicas=1 \
+		--set read.replicas=0 \
+		--set write.replicas=0 \
+		--set backend.replicas=0 \
+		--set chunksCache.enabled=false \
+		--set resultsCache.enabled=false \
+		--wait --timeout 3m
 
 monitoring-ui:
 	@echo "Grafana → http://localhost:3000  (admin/prom-operator)"

@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/YOUR_ORG/kubestronaut-lab
+    repoURL: https://github.com/tmohanvamsi/kubestronaut-lab
     targetRevision: HEAD
     path: manifests/apps
   destination:
