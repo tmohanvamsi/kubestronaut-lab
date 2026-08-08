@@ -1,5 +1,7 @@
 # Kubestronaut Lab — Step-by-Step Learning Guide
 
+> This is the best project.
+
 Work through this file **top to bottom**. Every section has:
 - **What it is** — the concept
 - **The file** — what we wrote and why each line exists
